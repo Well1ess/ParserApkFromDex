@@ -1,7 +1,11 @@
 package nim.shs1330.netease.com.parserapkfromdex;
 
 import android.app.Application;
+import android.app.Instrumentation;
 import android.content.Context;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager;
+import android.os.Bundle;
 import android.util.ArrayMap;
 import android.util.Log;
 
@@ -18,6 +22,7 @@ import java.lang.ref.WeakReference;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -99,8 +104,75 @@ public class ProxyApplication extends Application {
     @Override
     public void onCreate() {
         super.onCreate();
+        String appClassName = null;
+        try {
+            ApplicationInfo appInfo = this.getPackageManager()
+                    .getApplicationInfo(this.getPackageName(), PackageManager.GET_META_DATA);
+            Bundle bundle = appInfo.metaData;
+            if (bundle != null && bundle.containsKey("APP_NAME")) {
+                appClassName = bundle.getString("APP_NAME");
+            }
 
 
+            Class activityThreadC = Class.forName("android.app.ActivityThread");
+            Method currentActivityThreadM = activityThreadC.getDeclaredMethod("currentActivityThread");
+            currentActivityThreadM.setAccessible(true);
+            //当前ActivityThread实例
+            Object activityThreadO = currentActivityThreadM.invoke(null);
+
+            Field mBoundApplicationF = activityThreadC.getDeclaredField("mBoundApplication");
+            mBoundApplicationF.setAccessible(true);
+            //AppBindData对象
+            Object boundApplication = mBoundApplicationF.get(activityThreadO);
+
+            Class appBindData = Class.forName("android.app.ActivityThread$AppBindData");
+            Field loadedApkF = appBindData.getDeclaredField("info");
+            //LoadedApk对象
+            Object loadedApkO = loadedApkF.get(boundApplication);
+
+            Class loadedApkC = Class.forName("android.app.LoadedApk");
+            Field mApplicationF = loadedApkC.getDeclaredField("mApplication");
+            mApplicationF.setAccessible(true);
+            mApplicationF.set(loadedApkO, null);
+
+            //旧的App
+            Field oldApplicationF = activityThreadC.getDeclaredField("mInitialApplication");
+            Application oldApplication = (Application) oldApplicationF.get(activityThreadO);
+            //App list
+            Field mAllApplicationsF = activityThreadC.getDeclaredField("mAllApplications");
+            ArrayList<Application> mAllApplicationsO = (ArrayList<Application>) mAllApplicationsF.get(activityThreadO);
+
+            mAllApplicationsO.remove(oldApplication);
+
+            //
+            Field mApplicationInfoFInLoadedApk = loadedApkC.getDeclaredField("mApplicationInfo");
+            ApplicationInfo appInfo_LoadedApk = (ApplicationInfo) mApplicationInfoFInLoadedApk.get(loadedApkO);
+            Field mApplicationInfoFInAppBindData = appBindData.getDeclaredField("appInfo");
+            ApplicationInfo appInfo_AppBindData = (ApplicationInfo) mApplicationInfoFInAppBindData.get(boundApplication);
+
+            appInfo_LoadedApk.className = appClassName;
+            appInfo_AppBindData.className = appClassName;
+
+            Method makeApplicationM = loadedApkC.getDeclaredMethod("makeApplication", boolean.class, Instrumentation.class);
+            makeApplicationM.setAccessible(true);
+            Application app = (Application) makeApplicationM.invoke(loadedApkO, false, null);
+
+            //替换新的
+            oldApplicationF.set(activityThreadO, app);
+            app.onCreate();
+        } catch (PackageManager.NameNotFoundException e) {
+            e.printStackTrace();
+        } catch (NoSuchMethodException e) {
+            e.printStackTrace();
+        } catch (IllegalAccessException e) {
+            e.printStackTrace();
+        } catch (InvocationTargetException e) {
+            e.printStackTrace();
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+        } catch (NoSuchFieldException e) {
+            e.printStackTrace();
+        }
     }
 
     private void splitSrcApk(byte[] apkData) throws IOException {
