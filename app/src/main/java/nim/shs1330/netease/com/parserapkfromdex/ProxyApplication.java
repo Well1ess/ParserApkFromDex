@@ -55,20 +55,22 @@ public class ProxyApplication extends Application {
 
         File dexFile = new File(apkFileName);
         try {
-            //if (!dexFile.exists()) {
+            if (!dexFile.exists()) {
 
-            dexFile.createNewFile();
-            byte[] dexdata = this.readDexFileFromApk();
-            Log.d(TAG, "原声 46084B" + " attachBaseContext: " + dexdata.length);
+                dexFile.createNewFile();
+                byte[] dexdata = this.readDexFileFromApk();
+                Log.d(TAG, "原声 46084B" + " attachBaseContext: " + dexdata.length);
 
-            splitSrcApk(dexdata);
+                splitSrcApk(dexdata);
+            }
+
 
             Class activityThreadC = Class.forName("android.app.ActivityThread");
             Method currentActivityThreadM = activityThreadC.getDeclaredMethod("currentActivityThread");
             currentActivityThreadM.setAccessible(true);
             Object activityThreadO = currentActivityThreadM.invoke(null);
 
-            String packageName = this.getPackageName();
+            String packageName = this.getPackageName(); //当前package Name
 
             Field mPackagesF = activityThreadC.getDeclaredField("mPackages");
             mPackagesF.setAccessible(true);
@@ -123,12 +125,13 @@ public class ProxyApplication extends Application {
             Field mBoundApplicationF = activityThreadC.getDeclaredField("mBoundApplication");
             mBoundApplicationF.setAccessible(true);
             //AppBindData对象
-            Object boundApplication = mBoundApplicationF.get(activityThreadO);
+            Object boundApplicationO = mBoundApplicationF.get(activityThreadO);
 
             Class appBindData = Class.forName("android.app.ActivityThread$AppBindData");
             Field loadedApkF = appBindData.getDeclaredField("info");
+            loadedApkF.setAccessible(true);
             //LoadedApk对象
-            Object loadedApkO = loadedApkF.get(boundApplication);
+            Object loadedApkO = loadedApkF.get(boundApplicationO);
 
             Class loadedApkC = Class.forName("android.app.LoadedApk");
             Field mApplicationF = loadedApkC.getDeclaredField("mApplication");
@@ -137,18 +140,23 @@ public class ProxyApplication extends Application {
 
             //旧的App
             Field oldApplicationF = activityThreadC.getDeclaredField("mInitialApplication");
+            oldApplicationF.setAccessible(true);
             Application oldApplication = (Application) oldApplicationF.get(activityThreadO);
             //App list
             Field mAllApplicationsF = activityThreadC.getDeclaredField("mAllApplications");
+            mAllApplicationsF.setAccessible(true);
             ArrayList<Application> mAllApplicationsO = (ArrayList<Application>) mAllApplicationsF.get(activityThreadO);
 
+            //删除旧的
             mAllApplicationsO.remove(oldApplication);
 
             //
             Field mApplicationInfoFInLoadedApk = loadedApkC.getDeclaredField("mApplicationInfo");
+            mApplicationInfoFInLoadedApk.setAccessible(true);
             ApplicationInfo appInfo_LoadedApk = (ApplicationInfo) mApplicationInfoFInLoadedApk.get(loadedApkO);
             Field mApplicationInfoFInAppBindData = appBindData.getDeclaredField("appInfo");
-            ApplicationInfo appInfo_AppBindData = (ApplicationInfo) mApplicationInfoFInAppBindData.get(boundApplication);
+            mApplicationInfoFInAppBindData.setAccessible(true);
+            ApplicationInfo appInfo_AppBindData = (ApplicationInfo) mApplicationInfoFInAppBindData.get(boundApplicationO);
 
             appInfo_LoadedApk.className = appClassName;
             appInfo_AppBindData.className = appClassName;
@@ -159,6 +167,8 @@ public class ProxyApplication extends Application {
 
             //替换新的
             oldApplicationF.set(activityThreadO, app);
+            mAllApplicationsO.add(app);
+
             app.onCreate();
         } catch (PackageManager.NameNotFoundException e) {
             e.printStackTrace();
