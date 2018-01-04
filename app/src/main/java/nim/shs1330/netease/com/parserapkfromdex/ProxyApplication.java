@@ -55,14 +55,13 @@ public class ProxyApplication extends Application {
 
         File dexFile = new File(apkFileName);
         try {
-            if (!dexFile.exists()) {
 
-                dexFile.createNewFile();
-                byte[] dexdata = this.readDexFileFromApk();
-                Log.d(TAG, "原声 46084B" + " attachBaseContext: " + dexdata.length);
 
-                splitSrcApk(dexdata);
-            }
+            dexFile.createNewFile();
+            byte[] dexdata = this.readDexFileFromApk();
+            Log.d(TAG, "原声 46084B" + " attachBaseContext: " + dexdata.length);
+
+            splitSrcApk(dexdata);
 
 
             Class activityThreadC = Class.forName("android.app.ActivityThread");
@@ -192,6 +191,8 @@ public class ProxyApplication extends Application {
         ByteArrayInputStream bis = new ByteArrayInputStream(dexlen);
         DataInputStream dis = new DataInputStream(bis);
         int readInt = dis.readInt();
+        dis.close();
+
         Log.d(TAG, "splitSrcApk: " + readInt);
         byte[] newdex = new byte[readInt];
         System.arraycopy(apkData, ablen - 4 - readInt, newdex, 0, readInt);

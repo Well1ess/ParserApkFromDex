@@ -14,7 +14,7 @@
             android:name="APP_NAME"
             android:value="nim.shs1330.netease.com.tasksys.BaseApplication"/>
         <activity
-            android:name=".MainActivity"
+            android:name="nim.shs1330.netease.com.tasksys.MainActivity"
             android:label="@string/title_activity_main"
             android:theme="@style/AppTheme.NoActionBar">
             <intent-filter>
