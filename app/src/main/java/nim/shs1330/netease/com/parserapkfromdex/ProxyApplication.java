@@ -5,6 +5,8 @@ import android.app.Instrumentation;
 import android.content.Context;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
+import android.content.res.AssetManager;
+import android.content.res.Resources;
 import android.os.Bundle;
 import android.util.ArrayMap;
 import android.util.Log;
@@ -38,6 +40,8 @@ public class ProxyApplication extends Application {
     private String apkFileName;
     private String odexPath;
     private String libPath;
+
+    public static Resources thatR;
 
     @Override
     protected void attachBaseContext(Context base) {
@@ -85,6 +89,8 @@ public class ProxyApplication extends Application {
             DexClassLoader loader = new DexClassLoader(apkFileName, odexPath, libPath, parentLoader);
 
             mClassLoaderF.set(wr.get(), loader);
+
+            thatR = createResources(createAssetManager(apkFileName));
 
         } catch (IOException e) {
             e.printStackTrace();
@@ -182,6 +188,25 @@ public class ProxyApplication extends Application {
         } catch (NoSuchFieldException e) {
             e.printStackTrace();
         }
+    }
+
+    private AssetManager createAssetManager(String dexPath) {
+        try {
+            AssetManager assetManager = AssetManager.class.newInstance();
+            Method addAssetPath = assetManager.getClass().getMethod("addAssetPath", String.class);
+            addAssetPath.invoke(assetManager, dexPath);
+            return assetManager;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+
+    }
+
+    private Resources createResources(AssetManager assetManager) {
+        Resources superRes = getBaseContext().getResources();
+        Resources resources = new Resources(assetManager, superRes.getDisplayMetrics(), superRes.getConfiguration());
+        return resources;
     }
 
     private void splitSrcApk(byte[] apkData) throws IOException {
